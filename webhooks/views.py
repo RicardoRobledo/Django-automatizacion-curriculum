@@ -189,6 +189,7 @@ class TestView(View):
     async def get(self, request):
 
         google_credentials_obj = await sync_to_async(GoogleCredentialsModel.objects.first)()
+        print(f'----> {google_credentials_obj}')
 
         if google_credentials_obj is None:
             return redirect('authorize')
