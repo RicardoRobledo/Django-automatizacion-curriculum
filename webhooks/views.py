@@ -49,10 +49,10 @@ class EmailWebookView(View):
 
         # No usar sesiones
 
-        queryset = await sync_to_async(GoogleCredentialsModel.objects.all)()
+        queryset = GoogleCredentialsModel.objects.all()
 
         credentials = google.oauth2.credentials.Credentials(
-            queryset.first().credentials)
+            (await sync_to_async(queryset.first)()).credentials)
 
         # Check if credentials are valid
         if not credentials.valid:
