@@ -258,8 +258,8 @@ class OAuth2CallbackView(View):
 
         credentials = flow.credentials
 
-        google_credentials_obj.update(
-            credentials=credentials_to_dict(credentials))
+        print('--------------------')
+        print(await sync_to_async(google_credentials_obj.update)(credentials=credentials_to_dict(credentials)))
 
         return redirect('test_api_request')
 
