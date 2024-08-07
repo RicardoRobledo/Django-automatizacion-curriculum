@@ -49,10 +49,10 @@ class EmailWebookView(View):
 
         # No usar sesiones
 
-        google_credentials_obj = await sync_to_async(GoogleCredentialsModel.objects.first)()
+        queryset = await sync_to_async(GoogleCredentialsModel.objects.all)()
 
         credentials = google.oauth2.credentials.Credentials(
-            google_credentials_obj.credentials)
+            queryset.first().credentials)
 
         # Check if credentials are valid
         if not credentials.valid:
@@ -64,16 +64,9 @@ class EmailWebookView(View):
                     return HttpResponse("Error refreshing credentials", status=500)
 
                 # Save the refreshed credentials back to the session
-                google_credentials_obj.credentials = credentials_to_dict(
-                    credentials)
+                await sync_to_async(queryset.update)(credentials=credentials_to_dict(credentials))
             else:
                 return redirect('authorize')
-
-        drive = googleapiclient.discovery.build(
-            API_SERVICE_NAME, API_VERSION, credentials=credentials)
-
-        # Save credentials back to session in case access token was refreshed
-        google_credentials_obj.credentials = credentials_to_dict(credentials)
 
         body = json.loads(request.body)
         url = body['attachments'][0]['url']
@@ -188,18 +181,16 @@ class TestView(View):
 
     async def get(self, request):
 
-        google_credentials_obj = await sync_to_async(GoogleCredentialsModel.objects.first)()
-        print(f'----> {google_credentials_obj}')
+        queryset = GoogleCredentialsModel.objects.all()
 
-        if google_credentials_obj is None:
+        credentials_exist = await sync_to_async(queryset.exists)()
+
+        if not credentials_exist:
             return redirect('authorize')
-
-        # Print credentials to verify
-        print("Credentials: ", google_credentials_obj.credentials)
 
         # Load credentials from the session
         credentials = google.oauth2.credentials.Credentials(
-            google_credentials_obj.credentials)
+            (await sync_to_async(queryset.first)()).credentials)
 
         # Check if credentials are valid
         if not credentials.valid:
@@ -211,8 +202,7 @@ class TestView(View):
                     return HttpResponse("Error refreshing credentials", status=500)
 
                 # Save the refreshed credentials back to the session
-                google_credentials_obj.credentials.update(credentials=credentials_to_dict(
-                    credentials))
+                await sync_to_async(queryset.update)(credentials=credentials_to_dict(credentials))
             else:
                 return redirect('authorize')
 
@@ -245,10 +235,12 @@ class OAuth2CallbackView(View):
 
     async def get(self, request):
 
-        google_credentials_obj = await sync_to_async(GoogleCredentialsModel.objects.first)()
+        queryset = GoogleCredentialsModel.objects.all()
+
+        state = (await sync_to_async(queryset.first)()).state
 
         flow = google_auth_oauthlib.flow.Flow.from_client_config(
-            json.loads(CLIENT_SECRETS_FILE), scopes=SCOPES, state=google_credentials_obj.state)
+            json.loads(CLIENT_SECRETS_FILE), scopes=SCOPES, state=state)
 
         flow.redirect_uri = request.build_absolute_uri(
             '/webhooks/oauth2callback/')
@@ -258,8 +250,7 @@ class OAuth2CallbackView(View):
 
         credentials = flow.credentials
 
-        print('--------------------')
-        print(await sync_to_async(google_credentials_obj.update)(credentials=credentials_to_dict(credentials)))
+        print(await sync_to_async(queryset.update)(credentials=credentials_to_dict(credentials)))
 
         return redirect('test_api_request')
 
